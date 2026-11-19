@@ -44,7 +44,7 @@ func (c Currency) Decimals() int {
 const DefaultCurrency = CNY
 
 // ErrCurrencyMismatch is returned by any arithmetic across two currencies.
-// SimpleLife has no exchange rates (ADR-011): mixing is an error, never a guess.
+// SimpleLife has no exchange rates: mixing currencies is an error, never a guess.
 var ErrCurrencyMismatch = errors.New("shared: currency mismatch")
 
 // Money is an exact amount in the currency's minor unit (分 for CNY, cent for
@@ -238,7 +238,7 @@ func SumMoney(c Currency, amounts ...Money) (Money, error) {
 }
 
 // MoneyTotal is one currency's subtotal. Every aggregate returns a slice of
-// these instead of a single number (ADR-011).
+// these instead of a single number.
 type MoneyTotal struct {
 	Currency Currency
 	Amount   Money

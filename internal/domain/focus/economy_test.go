@@ -8,7 +8,7 @@ import (
 	"github.com/iotus3/simplelife/app/internal/domain/shared"
 )
 
-// economy builds the settings from §3.12.3: ¥0.50 per minute, half penalty.
+// economy builds the defaults: half a yuan per minute, half penalty.
 func economy(t *testing.T, enabled bool) focus.EconomySettings {
 	t.Helper()
 	e := focus.DefaultEconomySettings(shared.CNY)
@@ -72,7 +72,7 @@ func TestDefaultEconomySettingsMatchTheDesign(t *testing.T) {
 }
 
 func TestRewardFormulaCases(t *testing.T) {
-	// The table in §3.12.3, verbatim.
+	// The formula table, case by case.
 	cases := []struct {
 		name          string
 		elapsed       time.Duration

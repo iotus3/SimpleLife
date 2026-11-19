@@ -265,8 +265,8 @@ func TestCancelCountUpCostsNothing(t *testing.T) {
 }
 
 func TestBookingFailureDoesNotLoseThePomodoro(t *testing.T) {
-	// ADR-012: the session commits first, the money is written after. A broken
-	// booker must therefore cost a warning, never the completion.
+	// The session commits first and the money is written after, so a broken booker
+	// must cost a warning, never the completion.
 	st := store.New()
 	clk := harness.NewClock(harness.At("2026-11-17 09:00:00"))
 	ids := harness.NewIDs()

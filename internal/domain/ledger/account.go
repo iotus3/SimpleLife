@@ -218,8 +218,8 @@ func (c *Category) AttachParent(parent *Category) error {
 	return nil
 }
 
-// Rename changes a user category's name; builtin categories are managed by the
-// translation catalogue instead (§5.13.4).
+// Rename changes a user category's name; builtin categories are named by the
+// translation catalogue instead.
 func (c *Category) Rename(name string) error {
 	if c.BuiltinKey != "" {
 		return shared.Conflict("ledger.category.builtin", "a builtin category cannot be renamed; create a new one")

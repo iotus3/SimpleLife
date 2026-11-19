@@ -14,9 +14,9 @@ type migration struct {
 	stmts   []string
 }
 
-// migrations is the schema history. It mirrors docs/schema.md (§5.9) and may only
-// add tables, columns and indexes — dropping a column in SQLite means rebuilding
-// the table, which is the one migration this project does not want to write.
+// migrations is the schema history and may only add tables, columns and indexes:
+// dropping a column in SQLite means rebuilding the table, which this project
+// deliberately avoids.
 var migrations = []migration{
 	{
 		version: 1,
@@ -109,8 +109,8 @@ var migrations = []migration{
 			`CREATE INDEX idx_entry_occurred ON entry(occurred_at DESC)`,
 			`CREATE INDEX idx_entry_account  ON entry(account_id, occurred_at DESC)`,
 			`CREATE INDEX idx_entry_category ON entry(category_id, occurred_at DESC)`,
-			// One session books at most one entry (ADR-012). The row keeps its
-			// session id even after the user edits it into a manual entry.
+			// One session books at most one entry. The row keeps its session id even
+			// after the user edits it into a manual entry.
 			`CREATE UNIQUE INDEX uq_entry_focus_session
 				ON entry(focus_session_id) WHERE focus_session_id <> ''`,
 
