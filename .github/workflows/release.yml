@@ -1,0 +1,125 @@
+# Builds and publishes the Windows package when a version tag is pushed, and only then.
+# A push to main runs ci.yml, which checks the same things without packaging anything.
+#
+# The tag is the release: it must agree with [app] version in viva.toml, and the run
+# stops before packaging if it does not, so a program never reports a version the tag
+# does not name.
+#
+# What lands in the release is what an installed copy updates from:
+#   simplelife-<version>-windows-amd64.zip   the program, beside its datas/ folder
+#   checksums.txt                            sha256sum lines, the fallback when the
+#                                            asset's own digest is not reported
+# The updater reads releases/latest, matches the asset for its own platform and holds
+# the download to that SHA-256 (internal/infrastructure/update).
+#
+# Release a version:
+#   just update-version 0.2.0
+#   git commit -am "chore: release 0.2.0"
+#   git tag v0.2.0
+#   git push origin main --tags
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write # the release and its assets
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Package and publish
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      # Full history: the build stamps the commit it was made from, and the notes are
+      # generated from the commits since the previous tag.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Check the tag against viva.toml
+        shell: bash
+        run: |
+          version="$(bash scripts/version.sh --show)"
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::the tag is $GITHUB_REF_NAME but viva.toml says $version"
+            echo "::error::run: just update-version ${GITHUB_REF_NAME#v}, commit, tag again"
+            exit 1
+          fi
+          echo "tagging version $version"
+
+      # The same gate as ci.yml, run again here: a tag may point at a commit that was
+      # never pushed to main, and a package is only worth publishing if it passed.
+      - name: Check the generated version
+        shell: bash
+        run: bash scripts/version.sh --check
+
+      - name: Check formatting
+        shell: bash
+        run: |
+          out="$(gofmt -l .)"
+          if [ -n "$out" ]; then
+            echo "::error::these files need gofmt:"
+            echo "$out"
+            exit 1
+          fi
+
+      - name: Vet
+        shell: bash
+        run: go vet ./...
+
+      - name: Check the layers
+        shell: bash
+        run: bash scripts/check-deps.sh
+
+      - name: Test
+        shell: bash
+        run: go test ./... -count=1
+
+      # scripts/build.sh regenerates the version constant from viva.toml and then asks
+      # `viva package` for the archive, so linking, the icon and the name follow the
+      # manifest instead of this file.
+      - name: Package
+        shell: bash
+        run: bash scripts/build.sh --clean
+
+      # sha256sum writes "<hash>  <name>" and prefixes the name with a "*" whenever it
+      # reads the file as binary (which it does on Windows). The updater matches the line
+      # by name, so the file is written in the one form both sides agree on.
+      - name: Checksums
+        shell: bash
+        run: |
+          cd dist
+          : > checksums.txt
+          for archive in ./*.zip; do
+            printf '%s  %s\n' "$(sha256sum "$archive" | cut -d' ' -f1)" "${archive#./}" >> checksums.txt
+          done
+          cat checksums.txt
+
+      # A re-run of the same tag replaces its assets instead of failing; the tag, and
+      # therefore the release, is still the only way a package reaches users.
+      - name: Publish
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="SimpleLife ${GITHUB_REF_NAME#v}"
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "▶ re-uploading the assets of $GITHUB_REF_NAME"
+            gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+              --clobber dist/*.zip dist/checksums.txt
+          else
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+              --title "$title" --generate-notes \
+              dist/*.zip dist/checksums.txt
+          fi

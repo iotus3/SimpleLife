@@ -78,6 +78,25 @@ run `simplelife.exe`.
   the copy that is already running and brings its window forward, including from
   the status area.
 
+## Updates
+
+**About &rarr; Check for updates** reads this repository's latest release and says
+what it found; it never downloads by itself.
+
+Pressing **Install** then does four things in order, and stops at the first one that
+fails:
+
+1. downloads the package for this platform from the release,
+2. holds it to the SHA-256 the release published,
+3. takes `simplelife.exe` out of the archive and puts it in place of the running
+   one — the old file is renamed to `simplelife.exe.old` and removed on the next
+   start,
+4. restarts the program.
+
+A nightly check is not part of this: nothing contacts the network until you ask.
+Replacing the executable keeps `datas/` exactly where it is, so an update never
+touches your data.
+
 ## Quick start
 
 1. **Tasks &rarr; New** &mdash; write the todo, pick a priority and, if you like, how
@@ -188,6 +207,24 @@ just update-version 0.2.0   # edit viva.toml, regenerate internal/buildinfo/vers
 just version                # print it
 just version-check          # fail if the generated file is behind (also inside `just check`)
 ```
+
+## Releases
+
+A tag is the release. Pushing one runs `.github/workflows/release.yml`, which
+refuses to build unless the tag and `viva.toml` agree, repeats the whole
+`just check` gate, packages with `scripts/build.sh`, writes `checksums.txt` and
+publishes both files to the release; the updater reads that same release, so the
+two can never describe different builds.
+
+```sh
+just update-version 0.2.0
+git commit -am "chore: release 0.2.0"
+git tag v0.2.0
+git push origin main --tags
+```
+
+`.github/workflows/ci.yml` runs the same checks on every push to `main` and every
+pull request, and packages nothing: a package exists only where a tag says so.
 
 ## Architecture
 
