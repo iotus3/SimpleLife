@@ -15,8 +15,10 @@
 # from it first, so the program and the package can never disagree.
 #
 # Pure Go: CGO_ENABLED=0. Viva's Windows backend calls into the system through purego and
-# SQLite is modernc.org/sqlite, so no C compiler is involved.
+# SQLite is modernc.org/sqlite, so no C compiler is involved and the host does not have to
+# be Windows: the release pipeline builds this package on Linux, and so can anyone else.
 set -euo pipefail
+export CGO_ENABLED=0
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"

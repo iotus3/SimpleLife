@@ -173,7 +173,8 @@ closing quits.
 ## Build from source
 
 Go 1.27+, bash and [just](https://github.com/casey/just). No C compiler:
-`CGO_ENABLED=0` builds and runs the whole thing.
+`CGO_ENABLED=0` builds and runs the whole thing. Any of the three platforms can
+build it — the Windows package in `dist/` is a cross-compile.
 
 ```sh
 just doctor     # toolchain and data folder
@@ -223,6 +224,9 @@ git tag v0.2.0
 git push origin main --tags
 ```
 
+Both workflows run on a Linux runner: the program is pure Go, so the checks are
+the same everywhere and the Windows package is a cross-compile
+(`CGO_ENABLED=0`, `viva package --target windows`), not a second toolchain.
 `.github/workflows/ci.yml` runs the same checks on every push to `main` and every
 pull request, and packages nothing: a package exists only where a tag says so.
 

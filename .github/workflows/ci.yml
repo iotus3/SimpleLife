@@ -1,6 +1,11 @@
 # Checks on every push to main and every pull request. Nothing is packaged here:
 # a package belongs to a tag, and that is release.yml's job.
 #
+# Linux, not Windows: the program is pure Go, so the whole suite runs on any of the three
+# platforms, and a Linux runner is the cheap, fast, always-available one. The Windows
+# package is cross-compiled on Linux too (see release.yml), which is why this file and
+# that one run on the same image.
+#
 # The steps are exactly `just check` (scripts/version.sh --check, gofmt, go vet,
 # scripts/check-deps.sh, go test). `just` is not installed on the runner, so the
 # scripts are called directly instead of duplicating their logic in YAML.
@@ -15,6 +20,11 @@ on:
 permissions:
   contents: read
 
+# The release package is built with cgo off; building and testing the same way here
+# means a green run describes the bytes that ship.
+env:
+  CGO_ENABLED: "0"
+
 # A newer push to a pull request replaces the run it superseded. main is never
 # cancelled: every commit that lands there is a commit a tag may be cut from.
 concurrency:
@@ -24,7 +34,7 @@ concurrency:
 jobs:
   check:
     name: Check
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -37,11 +47,9 @@ jobs:
       # The version constant is generated from viva.toml and committed, so a pull
       # request that edits one and not the other stops here before anything compiles.
       - name: Verify the generated version
-        shell: bash
         run: bash scripts/version.sh --check
 
       - name: Check formatting
-        shell: bash
         run: |
           out="$(gofmt -l .)"
           if [ -n "$out" ]; then
@@ -51,14 +59,11 @@ jobs:
           fi
 
       - name: Vet
-        shell: bash
         run: go vet ./...
 
       # A package that imports upward fails here, before the tests would pass on it.
       - name: Check the layers
-        shell: bash
         run: bash scripts/check-deps.sh
 
       - name: Test
-        shell: bash
         run: go test ./... -count=1

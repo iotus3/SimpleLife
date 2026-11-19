@@ -1,6 +1,11 @@
 # Builds and publishes the Windows package when a version tag is pushed, and only then.
 # A push to main runs ci.yml, which checks the same things without packaging anything.
 #
+# One Linux runner builds the Windows package: the program is pure Go (no cgo), so
+# GOOS=windows is a cross-compile, not a second toolchain. `viva package --target
+# windows` writes the icon and the version resource itself and strips the symbols, so
+# nothing on the runner has to know how a Windows executable is assembled.
+#
 # The tag is the release: it must agree with [app] version in viva.toml, and the run
 # stops before packaging if it does not, so a program never reports a version the tag
 # does not name.
@@ -26,6 +31,11 @@ on:
 permissions:
   contents: write # the release and its assets
 
+# The Windows package is cross-compiled with cgo off; the checks below run the way the
+# package is built.
+env:
+  CGO_ENABLED: "0"
+
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
@@ -33,7 +43,7 @@ concurrency:
 jobs:
   release:
     name: Package and publish
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
       # Full history: the build stamps the commit it was made from, and the notes are
@@ -48,7 +58,6 @@ jobs:
           cache-dependency-path: go.sum
 
       - name: Check the tag against viva.toml
-        shell: bash
         run: |
           version="$(bash scripts/version.sh --show)"
           if [ "v$version" != "$GITHUB_REF_NAME" ]; then
@@ -61,11 +70,9 @@ jobs:
       # The same gate as ci.yml, run again here: a tag may point at a commit that was
       # never pushed to main, and a package is only worth publishing if it passed.
       - name: Check the generated version
-        shell: bash
         run: bash scripts/version.sh --check
 
       - name: Check formatting
-        shell: bash
         run: |
           out="$(gofmt -l .)"
           if [ -n "$out" ]; then
@@ -75,29 +82,24 @@ jobs:
           fi
 
       - name: Vet
-        shell: bash
         run: go vet ./...
 
       - name: Check the layers
-        shell: bash
         run: bash scripts/check-deps.sh
 
       - name: Test
-        shell: bash
         run: go test ./... -count=1
 
       # scripts/build.sh regenerates the version constant from viva.toml and then asks
-      # `viva package` for the archive, so linking, the icon and the name follow the
-      # manifest instead of this file.
+      # `viva package` for the Windows archive, so linking, the icon and the name follow
+      # the manifest instead of this file.
       - name: Package
-        shell: bash
         run: bash scripts/build.sh --clean
 
-      # sha256sum writes "<hash>  <name>" and prefixes the name with a "*" whenever it
-      # reads the file as binary (which it does on Windows). The updater matches the line
-      # by name, so the file is written in the one form both sides agree on.
+      # sha256sum writes "<hash>  <name>" here; the loop keeps the name unqualified even
+      # where a glob or a binary-mode reader would prefix it, because the updater matches
+      # the line by name.
       - name: Checksums
-        shell: bash
         run: |
           cd dist
           : > checksums.txt
@@ -109,7 +111,6 @@ jobs:
       # A re-run of the same tag replaces its assets instead of failing; the tag, and
       # therefore the release, is still the only way a package reaches users.
       - name: Publish
-        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

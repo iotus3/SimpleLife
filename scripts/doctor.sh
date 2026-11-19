@@ -35,11 +35,11 @@ if command -v go >/dev/null 2>&1; then
     else
         fail "go $go_version is older than the $want go.mod asks for"
     fi
-    ok "CGO_ENABLED=$(go env CGO_ENABLED) (pure Go: Viva through purego, SQLite through modernc)"
+    ok "CGO_ENABLED=$(go env CGO_ENABLED) (scripts/build.sh sets 0: Viva through purego, SQLite through modernc)"
     if [ "$(go env GOOS)" = "windows" ]; then
-        ok "GOOS=windows (the release platform)"
+        ok "GOOS=windows (this machine runs what it builds)"
     else
-        warn "GOOS=$(go env GOOS); this version targets the Windows desktop only"
+        warn "GOOS=$(go env GOOS): the Windows package is cross-compiled (scripts/build.sh, and CI on Linux)"
     fi
 else
     fail "no go: install the version go.mod asks for"

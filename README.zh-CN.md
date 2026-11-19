@@ -140,7 +140,7 @@ SimpleLife（简·生活）是一个 Windows 桌面程序，把一天放在一�
 ## 从源码构建
 
 需要 Go 1.27+、bash 与 [just](https://github.com/casey/just)。**不需要 C 编译器**：
-`CGO_ENABLED=0` 就能构建并运行。
+`CGO_ENABLED=0` 就能构建并运行。三个平台都能构建——`dist/` 里的 Windows 包是交叉编译出来的。
 
 ```sh
 just doctor     # 检查工具链与数据目录
@@ -185,6 +185,8 @@ git tag v0.2.0
 git push origin main --tags
 ```
 
+两条流水线都跑在 Linux runner 上：程序是纯 Go，所以检查在哪个平台都一样，Windows 包靠
+交叉编译产出（`CGO_ENABLED=0` + `viva package --target windows`），不需要第二套工具链。
 `.github/workflows/ci.yml` 在每次推 `main` 和每个 PR 上跑同一套检查，但不打包：
 包只在 tag 处诞生。
 
