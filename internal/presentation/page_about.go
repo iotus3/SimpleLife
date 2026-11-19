@@ -18,11 +18,12 @@ import (
 )
 
 // The project's addresses. They are constants, not settings: a build that pointed
-// elsewhere would be a different application.
+// elsewhere would be a different application. GitHub repository names are case
+// insensitive, but they are written as the project publishes them.
 const (
-	repositoryURL = "https://github.com/iotus3/simplelife"
-	issuesURL     = "https://github.com/iotus3/simplelife/issues"
-	docsURL       = "https://github.com/iotus3/simplelife#readme"
+	repositoryURL = "https://github.com/iotus3/SimpleLife"
+	issuesURL     = "https://github.com/iotus3/SimpleLife/issues"
+	docsURL       = "https://github.com/iotus3/SimpleLife#readme"
 )
 
 // aboutPage is where a user checks what they are running, whether a newer build exists, and
@@ -101,11 +102,13 @@ func fact(c ui.C, s *State, label i18n.MessageID, value string) {
 		})
 }
 
-// aboutUpdate checks for a newer release and holds the automatic check; nothing is downloaded.
+// aboutUpdate checks for a newer release, offers to install it, and holds the automatic
+// check. Nothing is downloaded until the user asks.
 func (s *State) aboutUpdate(c ui.C) {
 	s.cardTitled(c, icons.Download, i18n.MsgAboutUpdate, nil, func() {
 		s.hint(c, i18n.T(s.lang, i18n.MsgAboutUpdateHint))
 		checking, result, failure := s.updateSnapshot()
+		installing, step, installErr := s.installSnapshot()
 		ui.Row(c).FillWidth().Items(ui.Center).Gap(12).Children(func() {
 			auto := s.deps.Settings.AutoUpdate()
 			box := ui.Switch(c, &auto, i18n.T(s.lang, i18n.MsgAboutAutoUpdate))
@@ -119,13 +122,21 @@ func (s *State) aboutUpdate(c ui.C) {
 				label = i18n.T(s.lang, i18n.MsgAboutChecking)
 			}
 			button := ui.Button(c, label).Icon(icons.RefreshCw)
-			if !s.deps.Update.Available() || checking {
+			if !s.deps.Update.Available() || checking || installing {
 				button = button.Disabled(true)
 			}
 			if button.Clicked() {
 				s.checkForUpdate(c)
 			}
 		})
+		switch {
+		case installErr != nil:
+			ui.Text(c, i18n.MessageFor(s.lang, installErr)).FontSize(12.5).
+				Color(s.palette.Expense).MaxLines(4)
+		case installing:
+			ui.Text(c, s.installStageMessage(step)).FontSize(12.5).
+				Color(s.palette.Muted).MaxLines(2)
+		}
 		switch {
 		case failure != nil:
 			ui.Text(c, i18n.MessageFor(s.lang, failure)).FontSize(12.5).
@@ -145,11 +156,22 @@ func (s *State) aboutUpdate(c ui.C) {
 							Color(s.palette.Muted)
 						ui.Text(c, result.Notes).FontSize(12.5).Color(s.palette.Text).MaxLines(4)
 					}
-					ui.Row(c).FillWidth().Children(func() {
+					if result.Installable {
+						s.hint(c, i18n.T(s.lang, i18n.MsgAboutInstallHint))
+					} else if s.deps.Update.CanInstall() {
+						s.hint(c, i18n.T(s.lang, i18n.MsgAboutNoPackage))
+					}
+					ui.Row(c).FillWidth().Items(ui.Center).Gap(8).Children(func() {
 						ui.Spacer(c)
 						if ui.Button(c, i18n.T(s.lang, i18n.MsgAboutOpenDownload)).
 							Icon(icons.ArrowUpRight).Clicked() {
 							s.openDownload(c, result.URL)
+						}
+						if result.Installable && !installing {
+							if ui.Button(c, i18n.T(s.lang, i18n.MsgAboutInstall)).
+								Icon(icons.Download).Clicked() {
+								s.startInstall(c)
+							}
 						}
 					})
 				})
@@ -157,6 +179,57 @@ func (s *State) aboutUpdate(c ui.C) {
 			ui.Text(c, i18n.T(s.lang, i18n.MsgAboutUpToDate, result.Latest)).FontSize(12.5).
 				Color(s.palette.Income).MaxLines(2)
 		}
+	})
+}
+
+// installStageMessage says what an installation is doing right now.
+func (s *State) installStageMessage(step update.Progress) string {
+	switch step.Stage {
+	case update.StageInstall:
+		return i18n.T(s.lang, i18n.MsgAboutInstalling)
+	case update.StageRestart:
+		return i18n.T(s.lang, i18n.MsgAboutRestarting)
+	default:
+		return i18n.T(s.lang, i18n.MsgAboutDownloading, int(step.Fraction()*100))
+	}
+}
+
+// startInstall downloads the release, replaces this program with it and starts the new
+// build. Everything runs off the paint: a package is megabytes, and the window has to
+// keep answering while it arrives.
+func (s *State) startInstall(c ui.C) {
+	if !s.deps.Update.CanInstall() {
+		return
+	}
+	c.After(func() {
+		s.setInstalling(true, update.Progress{Stage: update.StageDownload}, nil)
+		s.repaint()
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+			defer cancel()
+			err := s.deps.Update.Install(ctx, func(step update.Progress) {
+				s.setInstalling(true, step, nil)
+				s.repaint()
+			})
+			if err != nil {
+				s.setInstalling(false, update.Progress{}, err)
+				s.repaint()
+				return
+			}
+			// The program on disk is the new build by now. Start it, then end this one:
+			// the restart hook releases the single-instance claim first, so the new copy
+			// becomes the only one.
+			if s.deps.Restart != nil {
+				if restartErr := s.deps.Restart(); restartErr != nil {
+					s.setInstalling(false, update.Progress{}, restartErr)
+					s.repaint()
+					return
+				}
+			}
+			if s.quit != nil {
+				s.quit()
+			}
+		}()
 	})
 }
 

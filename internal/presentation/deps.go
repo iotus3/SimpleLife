@@ -31,8 +31,11 @@ type Deps struct {
 	Settings  *settings.Service
 	Export    *exportapp.Service
 	Dashboard *dashboard.Service
-	// Update is the release channel, or nil when this build has none.
+	// Update is the release feed, or nil when this build has none.
 	Update *updateapp.Service
+	// Restart starts the program an update has just put on disk. The composition root
+	// owns it because the single-instance claim has to be released first.
+	Restart func() error
 	// Import reads an exported file back into the database.
 	Import *ingestapp.Service
 	// Decode turns a file's bytes into documents. It lives in the infrastructure

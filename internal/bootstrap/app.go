@@ -3,7 +3,10 @@
 package bootstrap
 
 import (
+	"errors"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"sync"
 
 	"github.com/vivaui/viva/app"
@@ -43,8 +46,10 @@ func Run() error {
 	// command line to this copy and leaves. Buffered and coalesced, so a double-click that
 	// arrives twice is one request to come to the front.
 	launches := make(chan struct{}, 1)
+	var claim *singleinstance.Instance
 	if !secondInstanceAllowed() {
-		claim, primary, err := singleinstance.SingleInstance(instanceID, os.Args[1:], func([]string) {
+		primary := false
+		claim, primary, err = singleinstance.SingleInstance(instanceID, os.Args[1:], func([]string) {
 			select {
 			case launches <- struct{}{}:
 			default:
@@ -58,6 +63,9 @@ func Run() error {
 		}
 		defer claim.Close()
 	}
+	// A finished update leaves the previous build beside the program; it can only be
+	// removed once the process that ran it is gone, which is now.
+	updateinfra.CleanupPrevious(programPath())
 
 	store, err := sqlite.Open(config.DBPath)
 	if err != nil {
@@ -114,9 +122,9 @@ func Run() error {
 		store.Budgets(), store.Templates(), wallClock, ids,
 	)
 
-	// The release channel this build was pointed at. A source build has none, and
-	// the about page says so instead of offering a check that cannot work.
-	updates := updateapp.New(updateinfra.Fetcher{}, buildinfo.Version)
+	// The project's GitHub releases are the feed; a source build reads the same feed and
+	// simply finds nothing newer than itself.
+	updates := updateapp.New(updateinfra.GitHub{}, updateinfra.Installer{}, buildinfo.Version)
 
 	commit, buildDate := buildinfo.Identity()
 
@@ -147,6 +155,12 @@ func Run() error {
 			_ = notifier.Notify(shared.Notification{Title: title, Body: body})
 		},
 		Encode: exportinfra.Encode,
+		// A finished installation is followed by a new process: the claim goes first, or
+		// the new copy would hand its command line to the one that is about to exit.
+		Restart: func() error {
+			claim.Close()
+			return startAgain()
+		},
 	}
 	return presentation.Run(deps, presentation.WithLanguageObserver(setLanguage))
 }
@@ -154,7 +168,35 @@ func Run() error {
 // instanceID names the single-instance claim. Reverse-DNS, and the same for every
 // copy of the program: the identity that matters is "this program", not the folder a
 // copy happens to sit in.
-const instanceID = "dev.iotus3.simplelife"
+const instanceID = "dev.simplelife.app"
+
+// startAgain runs the program that is now on disk. It is called after an update has
+// replaced it, and never waits: the new copy is a separate process from the moment it
+// starts, and this one is about to end.
+func startAgain() error {
+	path := programPath()
+	if path == "" {
+		return errors.New("simplelife: cannot find the program to restart")
+	}
+	command := exec.Command(path)
+	command.Dir = filepath.Dir(path)
+	if err := command.Start(); err != nil {
+		return err
+	}
+	return command.Process.Release()
+}
+
+// programPath is the file this process runs from, symbolic links resolved.
+func programPath() string {
+	path, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		return resolved
+	}
+	return path
+}
 
 // allowSecondEnv lets a caller opt out of the claim. It exists for two honest
 // reasons: the smoke test must be able to run while the developer has the application
