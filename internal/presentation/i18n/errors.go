@@ -44,17 +44,23 @@ const (
 	MsgErrTemplateFields  MessageID = "error.template.fields"
 	MsgErrTemplateMissing MessageID = "error.template.missing"
 
-	MsgErrUpdate      MessageID = "error.update"
-	MsgErrStorage     MessageID = "error.storage"
-	MsgErrExportPlan  MessageID = "error.export.plan"
-	MsgErrExportWrite MessageID = "error.export.write"
-	MsgErrSettings    MessageID = "error.settings"
-	MsgErrMoney       MessageID = "error.money"
-	MsgErrIdentifier  MessageID = "error.identifier"
-	MsgErrUnknown     MessageID = "error.unknown_value"
-	MsgErrNumber      MessageID = "error.number"
-	MsgErrNotFound    MessageID = "error.not_found"
-	MsgErrDuplicate   MessageID = "error.duplicate"
+	MsgErrUpdate         MessageID = "error.update"
+	MsgErrUpdateNone     MessageID = "error.update.none"
+	MsgErrUpdateFeed     MessageID = "error.update.feed"
+	MsgErrUpdateInstall  MessageID = "error.update.install"
+	MsgErrUpdateChecksum MessageID = "error.update.checksum"
+	MsgErrUpdatePackage  MessageID = "error.update.package"
+	MsgErrUpdateReplace  MessageID = "error.update.replace"
+	MsgErrStorage        MessageID = "error.storage"
+	MsgErrExportPlan     MessageID = "error.export.plan"
+	MsgErrExportWrite    MessageID = "error.export.write"
+	MsgErrSettings       MessageID = "error.settings"
+	MsgErrMoney          MessageID = "error.money"
+	MsgErrIdentifier     MessageID = "error.identifier"
+	MsgErrUnknown        MessageID = "error.unknown_value"
+	MsgErrNumber         MessageID = "error.number"
+	MsgErrNotFound       MessageID = "error.not_found"
+	MsgErrDuplicate      MessageID = "error.duplicate"
 )
 
 // codeMessages maps every domain error code to the sentence shown for it; a test fails when a
@@ -235,14 +241,22 @@ var codeMessages = map[string]MessageID{
 	"import.category.parent": MsgErrImport,
 	"template.rule.parse":    MsgErrTemplateRule,
 
-	"update.not_configured":   MsgErrUpdate,
-	"update.no_url":           MsgErrUpdate,
-	"update.manifest":         MsgErrUpdate,
-	"update.manifest.version": MsgErrUpdate,
-	"update.url":              MsgErrUpdate,
-	"update.read":             MsgErrUpdate,
-	"update.status":           MsgErrUpdate,
-	"update.unreachable":      MsgErrUpdate,
+	"update.not_configured":      MsgErrUpdate,
+	"update.no_url":              MsgErrUpdate,
+	"update.read":                MsgErrUpdate,
+	"update.status":              MsgErrUpdate,
+	"update.unreachable":         MsgErrUpdate,
+	"update.none":                MsgErrUpdateNone,
+	"update.feed":                MsgErrUpdateFeed,
+	"update.feed.version":        MsgErrUpdateFeed,
+	"update.checksum_missing":    MsgErrUpdateFeed,
+	"update.install_unsupported": MsgErrUpdateInstall,
+	"update.nothing_to_install":  MsgErrUpdateInstall,
+	"update.asset":               MsgErrUpdateInstall,
+	"update.download":            MsgErrUpdateInstall,
+	"update.checksum":            MsgErrUpdateChecksum,
+	"update.package":             MsgErrUpdatePackage,
+	"update.replace":             MsgErrUpdateReplace,
 
 	"money.format":           MsgErrMoney,
 	"money.scale":            MsgErrMoney,

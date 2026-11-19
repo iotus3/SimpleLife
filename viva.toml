@@ -9,7 +9,7 @@
 [app]
 name = "SimpleLife"
 id = "dev.simplelife.app"
-version = "0.1.3"
+version = "0.1.6"
 executable = "simplelife"
 package = "./cmd/simplelife"
 # The same file the running window hands the desktop (see assets/assets.go). The

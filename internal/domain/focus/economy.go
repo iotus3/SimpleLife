@@ -6,8 +6,8 @@ import (
 	"github.com/iotus3/simplelife/app/internal/domain/shared"
 )
 
-// Reward quality is expressed in permille rather than float: money arithmetic in
-// this project never touches float64 (ADR-011), so a ratio is an integer too.
+// Reward quality is permille, not a float: money arithmetic never touches float64,
+// so a ratio is an integer too.
 const (
 	QualityPerfect          = 1000 // no interruption
 	QualityOneBreak         = 800  // exactly one interruption
@@ -18,8 +18,8 @@ const (
 	penaltyMinMinutesMax    = 60
 )
 
-// Outcome reasons. They are stable codes, not sentences: the presentation layer
-// translates them (ADR-013), so the domain never contains user-visible text.
+// Outcome reasons are stable codes, not sentences: the presentation layer
+// translates them, so the domain never holds user-visible text.
 const (
 	ReasonDisabled     = "focus.economy.disabled"
 	ReasonNotFocus     = "focus.economy.not_focus"
@@ -30,7 +30,7 @@ const (
 	ReasonCapReached   = "focus.economy.cap_reached"
 )
 
-// EconomySettings is the 专注经济 configuration (§3.12). Every amount is in the
+// EconomySettings is the focus economy configuration. Every amount is in the
 // currency of the reward account; there is no conversion anywhere.
 type EconomySettings struct {
 	Enabled bool
@@ -52,9 +52,9 @@ type EconomySettings struct {
 	PenaltyCategoryID shared.ID
 }
 
-// DefaultEconomySettings builds the defaults from §3.12.1: ¥0.50 per minute, half
-// penalty, a 5 minute grace period, and caps worth 8 (reward) and 4×0.5 (penalty)
-// standard 25-minute pomodoros. The feature still starts disabled.
+// DefaultEconomySettings: half a yuan per minute, half penalty, a 5 minute grace
+// period, and caps worth 8 (reward) and 4×0.5 (penalty) standard 25 minute
+// pomodoros. The feature still starts disabled.
 func DefaultEconomySettings(c shared.Currency) EconomySettings {
 	rate := shared.NewMoney(50, c)
 	return EconomySettings{
@@ -131,8 +131,8 @@ func divRoundHalfUp(v int64) int64 {
 	return -((-v + 500) / 1000)
 }
 
-// Reward computes what a completed session earns (design §3.12.2), clamped by what is left
-// of the daily cap.
+// Reward computes what a completed session earns, clamped by what is left of the
+// daily cap.
 func (e EconomySettings) Reward(s *Session, rewardedToday shared.Money) (Outcome, error) {
 	if !e.Enabled {
 		return Outcome{Reason: ReasonDisabled}, nil

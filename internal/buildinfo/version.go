@@ -3,4 +3,4 @@
 package buildinfo
 
 // Version is the version of this build.
-const Version = "0.1.3"
+const Version = "0.1.6"

@@ -1,21 +1,19 @@
 #!/usr/bin/env bash
 #
-# 版本号只有一处真相：viva.toml 的 [app] version。
+# The version lives in one place: [app] version in viva.toml.
 #
-# 框架 CLI 从这里取版本号去写 PE 版本资源、去命名发布包；程序自己读的是
-# internal/buildinfo/version.go 里的常量。那个文件由本脚本生成（并提交在仓库里），
-# 免得发版时改两处、漏一处 —— internal/buildinfo 的测试会在两者不一致时让
-# `just check` 变红。
+# The framework CLI reads it for the version resource and the package name; the program
+# reads internal/buildinfo/version.go, which this script generates (and which is
+# committed). internal/buildinfo's test fails when the two disagree.
 #
-# 用法:
-#   bash scripts/version.sh               按 viva.toml 重新生成 version.go
-#   bash scripts/version.sh --set 0.2.0   改 viva.toml 的版本号并重新生成
-#   bash scripts/version.sh --show        打印当前版本号
-#   bash scripts/version.sh --check       只检查生成物是否落后（不改文件），落后即退出 1
-#   -h, --help                            显示本帮助
+# Usage:
+#   bash scripts/version.sh               regenerate version.go from viva.toml
+#   bash scripts/version.sh --set 0.2.0   set the version and regenerate
+#   bash scripts/version.sh --show        print the version
+#   bash scripts/version.sh --check       fail when the generated file is behind
+#   -h, --help                            print this help
 #
-# 一般用 just 入口：`just version`、`just update-version 0.2.0`、`just version-check`
-# （`just check` 里就跑最后那个）。
+# Through just: `just version`, `just update-version 0.2.0`, `just version-check`.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -25,7 +23,7 @@ MANIFEST="viva.toml"
 GENERATED="internal/buildinfo/version.go"
 
 usage() {
-    sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
+    awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"
 }
 
 manifestVersion() {
@@ -35,16 +33,16 @@ manifestVersion() {
 setVersion() {
     local version=$1
     printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || {
-        echo "✗ 版本号必须是 x.y.z 形式，收到：$version" >&2
+        echo "✗ the version must be x.y.z, got: $version" >&2
         exit 2
     }
-    # 只改第一个 ^version = 行：viva.toml 里它是 [app] 的 version，别处没有同名键。
+    # The first ^version = line is [app] version; no other key has that name.
     awk -v version="$version" '
         /^version[[:space:]]*=/ && !done { print "version = \"" version "\""; done = 1; next }
         { print }
     ' "$MANIFEST" >"$MANIFEST.tmp"
     mv "$MANIFEST.tmp" "$MANIFEST"
-    echo "▶ viva.toml 版本号 → $version"
+    echo "▶ viva.toml version → $version"
 }
 
 # renderGenerated prints what version.go should contain for a version. Rendering and
@@ -65,29 +63,28 @@ writeGenerated() {
     local version=$1
     mkdir -p "$(dirname "$GENERATED")"
     renderGenerated "$version" >"$GENERATED"
-    echo "✓ 版本 $version → $GENERATED"
+    echo "✓ version $version → $GENERATED"
 }
 
-# checkGenerated fails when the committed file is not what viva.toml would produce.
-# It is a separate step from the Go test that compares the same two numbers: this one
-# runs before any compilation, says what to type, and cannot be skipped by a build
-# cache.
+# checkGenerated fails when the committed file is not what viva.toml would produce. It is
+# a separate step from the Go test that compares the same two numbers: this one runs
+# before any compilation, says what to type, and cannot be skipped by a build cache.
 checkGenerated() {
     local version=$1 rendered
     rendered="$(mktemp)"
     trap 'rm -f "$rendered"' RETURN
     renderGenerated "$version" >"$rendered"
     if [ ! -f "$GENERATED" ]; then
-        echo "✗ 缺少 $GENERATED（跑 just update-version $version 或 bash scripts/version.sh）" >&2
+        echo "✗ $GENERATED is missing (run just update-version $version)" >&2
         return 1
     fi
     if ! diff -u "$GENERATED" "$rendered" >/dev/null; then
-        echo "✗ $GENERATED 落后于 viva.toml（后者是 $version）：" >&2
+        echo "✗ $GENERATED is behind viva.toml ($version):" >&2
         diff -u "$GENERATED" "$rendered" | sed 's/^/    /' >&2 || true
-        echo "  修复：just update-version $version" >&2
+        echo "  fix: just update-version $version" >&2
         return 1
     fi
-    echo "✓ 版本常量与 viva.toml 一致（$version）"
+    echo "✓ the version constant matches viva.toml ($version)"
 }
 
 case "${1:-}" in
@@ -102,7 +99,7 @@ case "${1:-}" in
 --check)
     version="$(manifestVersion)"
     if [ -z "$version" ]; then
-        echo "✗ $MANIFEST 里找不到 [app] version" >&2
+        echo "✗ no [app] version in $MANIFEST" >&2
         exit 1
     fi
     checkGenerated "$version"
@@ -111,24 +108,24 @@ case "${1:-}" in
 --set)
     version="${2:-}"
     if [ -z "$version" ]; then
-        echo "用法: bash scripts/version.sh --set <x.y.z>" >&2
+        echo "usage: bash scripts/version.sh --set <x.y.z>" >&2
         exit 2
     fi
     setVersion "$version"
     writeGenerated "$version"
-    echo "  下一步：git diff 确认，然后 just check"
+    echo "  next: git diff, then just check"
     exit 0
     ;;
 "") ;;
 *)
-    echo "未知参数：$1（试 --help）" >&2
+    echo "unknown argument: $1 (try --help)" >&2
     exit 2
     ;;
 esac
 
 version="$(manifestVersion)"
 if [ -z "$version" ]; then
-    echo "✗ $MANIFEST 里找不到 [app] version" >&2
+    echo "✗ no [app] version in $MANIFEST" >&2
     exit 1
 fi
 writeGenerated "$version"

@@ -18,7 +18,7 @@ import (
 // Labels supplies the localised header and sheet names. The application layer
 // cannot know the interface language, so the presentation layer passes this in.
 type Labels interface {
-	// Sheet is the human-readable name of a table ("待办" / "Tasks").
+	// Sheet is the localised name of a table for the current interface language.
 	Sheet(table string) string
 	// Column is the header of one column.
 	Column(table, column string) string
@@ -305,8 +305,8 @@ func rangeBounds(r shared.DateRange) (time.Time, time.Time) {
 	return from, to
 }
 
-// formatTime writes ISO-like local time. It is never localised: an export is read
-// by scripts as often as by people, and "Nov 17, 2026" sorts wrong (ADR-013).
+// formatTime writes ISO-like local time, never a localised format: exports are
+// read by scripts as often as by people, and "Nov 17, 2026" sorts wrong.
 func formatTime(t time.Time) string {
 	if t.IsZero() {
 		return ""

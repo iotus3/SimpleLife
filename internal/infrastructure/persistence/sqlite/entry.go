@@ -105,8 +105,8 @@ func (r EntryRepo) Aggregate(f ledger.EntryFilter, groupBy ledger.AggregateGroup
 	currency := make(map[string]shared.Currency, len(entries))
 	for _, e := range entries {
 		key := aggregateKey(e, groupBy)
-		// The currency is part of the bucket key: a CNY total and a USD total can
-		// never be added together (ADR-011).
+		// The currency is part of the bucket key: a CNY total and a USD total are
+		// never added together.
 		full := key + "\x00" + string(e.Amount.Currency())
 		b, ok := sums[full]
 		if !ok {

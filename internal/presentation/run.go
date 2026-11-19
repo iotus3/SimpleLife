@@ -95,6 +95,9 @@ func Run(deps Deps, opts ...Option) error {
 	}
 	return app.RunApplication(func(application *app.Application) error {
 		var err error
+		// The application object is the only thing that can end the process; an update
+		// that has replaced the program uses it to stop this build.
+		state.quit = application.Quit
 		window, err = application.OpenWindow(page.Config(config), &canvas)
 		if err != nil {
 			return err

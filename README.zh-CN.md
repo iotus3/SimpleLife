@@ -68,6 +68,20 @@ SimpleLife（简·生活）是一个 Windows 桌面程序，把一天放在一�
 - 一个用户同时只跑一份。再点一次 `simplelife.exe` 会把命令行交给已经在跑的那份并把它
   叫到前台，藏在状态区里的窗口也会回来。
 
+## 更新
+
+**关于 → 检查更新**会读取本仓库的最新发布并告诉你有哪个版本，不会自己下载。
+
+按 **安装** 之后按顺序做四件事，任何一步失败就停下：
+
+1. 从发布里下载本平台的压缩包；
+2. 用它公布的 SHA-256 校验这个包；
+3. 从包里取出 `simplelife.exe`，替换正在运行的 exe——旧文件先改名为
+   `simplelife.exe.old`，下次启动时删掉；
+4. 重启程序。
+
+没有后台轮询：你不点，它就不联网。替换的只是 exe，`datas/` 原地不动，更新不会碰你的数据。
+
 ## 快速开始
 
 1. **待办 → 新建**：写内容、选优先级，可以顺手填预估番茄数和**一个番茄多长**。
@@ -126,7 +140,7 @@ SimpleLife（简·生活）是一个 Windows 桌面程序，把一天放在一�
 ## 从源码构建
 
 需要 Go 1.27+、bash 与 [just](https://github.com/casey/just)。**不需要 C 编译器**：
-`CGO_ENABLED=0` 就能构建并运行。
+`CGO_ENABLED=0` 就能构建并运行。三个平台都能构建——`dist/` 里的 Windows 包是交叉编译出来的。
 
 ```sh
 just doctor     # 检查工具链与数据目录
@@ -156,6 +170,25 @@ just update-version 0.2.0   # 改 viva.toml，并重新生成 internal/buildinfo
 just version                # 打印当前版本
 just version-check          # 生成物落后就失败（`just check` 里也有）
 ```
+
+## 发版
+
+打标签就是发版。推一个 tag 会触发 `.github/workflows/release.yml`：tag 与 `viva.toml`
+不一致就直接拒绝，一致才重跑整套 `just check`、用 `scripts/build.sh` 打包、生成
+`checksums.txt`，把这两个文件发到 Release；程序里的更新通道读的正是同一个 Release，
+两边不可能对不上。
+
+```sh
+just update-version 0.2.0
+git commit -am "chore: release 0.2.0"
+git tag v0.2.0
+git push origin main --tags
+```
+
+两条流水线都跑在 Linux runner 上：程序是纯 Go，所以检查在哪个平台都一样，Windows 包靠
+交叉编译产出（`CGO_ENABLED=0` + `viva package --target windows`），不需要第二套工具链。
+`.github/workflows/ci.yml` 在每次推 `main` 和每个 PR 上跑同一套检查，但不打包：
+包只在 tag 处诞生。
 
 ## 架构
 

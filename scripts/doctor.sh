@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# 检查本机是否具备构建 / 运行 SimpleLife 的条件。
+# Check that this machine can build and run SimpleLife.
 #
-# 用法: bash scripts/doctor.sh
-# 退出码: 0 全部满足；1 存在阻塞项（缺 Go、Go 版本过低、缺 bash）。
+# Usage: bash scripts/doctor.sh
+# Exit code: 0 everything is there; 1 something blocks a build (no Go, Go too old, no bash).
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -16,78 +16,78 @@ ok()   { printf '  ✓ %s\n' "$1"; }
 warn() { printf '  ! %s\n' "$1"; WARNED=$((WARNED + 1)); }
 fail() { printf '  ✗ %s\n' "$1"; FAILED=$((FAILED + 1)); }
 
-# required_version 从 go.mod 里取出 go 指令要求的最低版本，例如 1.27.0。
+# required_version is the minimum the go directive in go.mod asks for, e.g. 1.27.0.
 required_version() {
     awk '$1 == "go" { print $2; exit }' go.mod
 }
 
-# version_ge A B：A >= B 时返回 0。
+# version_ge A B succeeds when A >= B.
 version_ge() {
     [ "$(printf '%s\n%s\n' "$2" "$1" | sort -V | head -1)" = "$2" ]
 }
 
-echo "▶ 工具链"
+echo "▶ toolchain"
 if command -v go >/dev/null 2>&1; then
     go_version="$(go env GOVERSION | sed 's/^go//')"
     want="$(required_version)"
     if version_ge "$go_version" "$want"; then
-        ok "go $go_version（go.mod 要求 ≥ $want）"
+        ok "go $go_version (go.mod wants >= $want)"
     else
-        fail "go $go_version 低于 go.mod 要求的 $want"
+        fail "go $go_version is older than the $want go.mod asks for"
     fi
-    ok "CGO_ENABLED=$(go env CGO_ENABLED)（纯 Go：Viva 走 purego，SQLite 用 modernc）"
+    ok "CGO_ENABLED=$(go env CGO_ENABLED) (scripts/build.sh sets 0: Viva through purego, SQLite through modernc)"
     if [ "$(go env GOOS)" = "windows" ]; then
-        ok "GOOS=windows（首发平台）"
+        ok "GOOS=windows (this machine runs what it builds)"
     else
-        warn "GOOS=$(go env GOOS)，本版本只支持 Windows 桌面端"
+        warn "GOOS=$(go env GOOS): the Windows package is cross-compiled (scripts/build.sh, and CI on Linux)"
     fi
 else
-    fail "找不到 go：请安装 Go 并使用 go.mod 要求的版本"
+    fail "no go: install the version go.mod asks for"
 fi
 
 if command -v just >/dev/null 2>&1; then
     ok "just $(just --version | awk '{print $2}')"
 else
-    warn "找不到 just：只能直接调用 scripts/*.sh"
+    warn "no just: scripts/*.sh can be run directly"
 fi
 
 if command -v bash >/dev/null 2>&1; then
     ok "bash $BASH_VERSION"
 else
-    fail "找不到 bash：工程脚本需要 bash 4 以上"
+    fail "no bash: the scripts need bash 4 or later"
 fi
 
 if command -v git >/dev/null 2>&1; then
     ok "git $(git --version | awk '{print $3}')"
 else
-    warn "找不到 git：版本号会退回 v0.0.0-dev"
+    warn "no git: the about page will show no commit"
 fi
 
-echo "▶ 源码树"
+echo "▶ source tree"
 if [ -z "$(gofmt -l .)" ]; then
-    ok "gofmt 无差异"
+    ok "gofmt reports nothing"
 else
-    warn "gofmt 有差异：$(gofmt -l . | tr '\n' ' ')"
+    warn "gofmt wants to change: $(gofmt -l . | tr '\n' ' ')"
 fi
 if go vet ./... >/dev/null 2>&1; then
-    ok "go vet 通过"
+    ok "go vet is clean"
 else
-    warn "go vet 有报告：运行 just vet 查看"
+    warn "go vet has something to say: run just vet"
 fi
 
-echo "▶ 数据目录"
-# 数据库跟着 exe 走：<exe 所在目录>/datas/simplelife.db。开发时 exe 在 build/，
-# 发布包里在解压目录。
+echo "▶ data folder"
+# The database travels with the program: <exe folder>/datas/simplelife.db. During
+# development the program is in build/, in a release it is wherever the zip was unpacked.
 data_dir="$ROOT_DIR/build/datas"
 if [ -f "$data_dir/simplelife.db" ]; then
-    ok "$data_dir/simplelife.db（$(wc -c <"$data_dir/simplelife.db" | tr -d ' ') 字节）"
+    ok "$data_dir/simplelife.db ($(wc -c <"$data_dir/simplelife.db" | tr -d ' ') bytes)"
 else
-    ok "exe 旁的 datas/simplelife.db（首次运行时创建）"
+    ok "datas/simplelife.db beside the program (created on first run)"
 fi
 
 echo
 if [ "$FAILED" -gt 0 ]; then
-    echo "✗ $FAILED 个阻塞项，$WARNED 个提示项"
+    echo "✗ $FAILED blocking, $WARNED advisory"
     exit 1
 fi
-echo "✓ 环境就绪（$WARNED 个提示项）"
+echo "✓ ready ($WARNED advisory)"

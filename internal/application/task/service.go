@@ -385,8 +385,8 @@ func (s *Service) HistoryGroups(day shared.LocalDate) ([]Group, error) {
 	return groups, nil
 }
 
-// lessGroup orders dated groups newest first and always puts the undated group
-// last, which is the "未排期" bucket at the bottom of the history view.
+// lessGroup orders dated groups newest first and keeps the undated group last, at
+// the bottom of the history view.
 func lessGroup(a, b Group) bool {
 	if a.Day.IsZero() {
 		return false

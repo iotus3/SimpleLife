@@ -215,14 +215,21 @@ type State struct {
 	importMu    sync.Mutex
 	importDraft importDraft
 
-	// Update check. The result arrives from a goroutine, so it is guarded; the
-	// notice is a flag the paint turns into a toast, because a toast must be shown
-	// while declaring.
+	// Update check and installation. Both arrive from a goroutine, so they are
+	// guarded; the notice is a flag the paint turns into a toast, because a toast must
+	// be shown while declaring.
 	updateMu       sync.Mutex
 	updateChecking bool
 	updateResult   *update.Result
 	updateErr      error
 	updateNotice   atomic.Bool
+	installing     bool
+	installStep    update.Progress
+	installErr     error
+
+	// quit ends the application; the composition root supplies it, because only it
+	// holds the application object.
+	quit func()
 
 	// secondLaunch is set when another start was handed to this copy. The paint
 	// turns it into a toast, because a window that comes forward looks exactly like
@@ -381,6 +388,24 @@ func (s *State) updateSnapshot() (bool, *update.Result, error) {
 	s.updateMu.Lock()
 	defer s.updateMu.Unlock()
 	return s.updateChecking, s.updateResult, s.updateErr
+}
+
+// installSnapshot reads the installation for the about page: whether one is running, how
+// far it has got, and what went wrong.
+func (s *State) installSnapshot() (bool, update.Progress, error) {
+	s.updateMu.Lock()
+	defer s.updateMu.Unlock()
+	return s.installing, s.installStep, s.installErr
+}
+
+// setInstalling marks an installation as running or finished, and clears the last error
+// when a new one starts.
+func (s *State) setInstalling(installing bool, step update.Progress, err error) {
+	s.updateMu.Lock()
+	defer s.updateMu.Unlock()
+	s.installing = installing
+	s.installStep = step
+	s.installErr = err
 }
 
 // Attach gives the state the window's invalidator, which background work uses to
