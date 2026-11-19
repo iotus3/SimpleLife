@@ -1,0 +1,21 @@
+# Every text file is stored with LF, and checked out with LF everywhere: the
+# project is built on Windows with Go and Bash, and a stray CRLF in a .sh file
+# breaks the shebang line.
+* text=auto eol=lf
+
+# Scripts must keep their line endings and be executable where the platform
+# supports it.
+*.sh text eol=lf
+justfile text eol=lf
+
+# Golden files are compared byte for byte: a CSV fixture whose line endings git
+# rewrote would fail the export tests on a fresh clone.
+internal/infrastructure/export/testdata/** -text
+
+# Binaries and archives are never converted.
+*.png binary
+*.jpg binary
+*.ico binary
+*.zip binary
+*.exe binary
+*.db binary

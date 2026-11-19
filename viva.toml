@@ -1,0 +1,25 @@
+# How the viva command sees this application (viva build, viva package).
+#
+# The project builds with the Go toolchain through the justfile too; this file
+# only names the application for the packaging commands.
+#
+#   viva build --target windows   desktop program  -> build/simplelife.exe
+#   viva package                 macOS app bundle  -> build/SimpleLife.app
+
+[app]
+name = "SimpleLife"
+id = "dev.simplelife.app"
+version = "0.1.3"
+executable = "simplelife"
+package = "./cmd/simplelife"
+# The same file the running window hands the desktop (see assets/assets.go). The
+# icon is a committed asset; nothing in the repository redraws it.
+icon = "assets/icon.png"
+
+[windows]
+publisher = "SimpleLife"
+
+[build]
+# `viva build` and `viva package` write here; the packaged program is
+# dist/simplelife-<version>-windows-amd64.zip.
+out = "dist"
